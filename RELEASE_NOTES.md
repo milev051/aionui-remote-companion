@@ -1,3 +1,8 @@
+## AionUi Remote Companion v1.2.1
+
+- Popravlja rušenje pri pokretanju na Samsung telefonu: prozor se kreira pre podešavanja navigacione trake.
+- Vraća vidljivu statusnu traku i povlačenje nadole za osvežavanje stranice.
+
 ## AionUi Remote Companion v1.1.1
 
 - Vraća prikaz iz v1.1.0 radi stabilizacije i izolacije problema iz v1.2.0.

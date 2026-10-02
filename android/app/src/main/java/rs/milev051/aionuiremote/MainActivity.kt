@@ -15,6 +15,7 @@ import android.os.Build
 import android.provider.Settings
 import android.view.Gravity
 import android.view.View
+import android.view.WindowInsets
 import android.view.WindowManager
 import android.webkit.CookieManager
 import android.webkit.DownloadListener
@@ -35,6 +36,7 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.FileProvider
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
@@ -49,6 +51,7 @@ class MainActivity : Activity() {
     private lateinit var errorText: TextView
     private lateinit var progress: ProgressBar
     private lateinit var webView: WebView
+    private lateinit var swipeRefresh: SwipeRefreshLayout
     private var activeHost: String? = null
     private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
     private var pendingUpdateFile: File? = null
@@ -60,7 +63,7 @@ class MainActivity : Activity() {
         private const val PREF_HOST = "host"
         private const val PREF_UPDATE_PENDING = "update_pending"
         private const val RELEASE_API = "https://api.github.com/repos/milev051/aionui-remote-companion/releases/latest"
-        private const val VERSION_NAME = "1.1.1"
+        private const val VERSION_NAME = "1.2.1"
         private const val BACKGROUND = 0xFF10131A.toInt()
         private const val CARD = 0xFF191E28.toInt()
         private const val FIELD = 0xFF232A36.toInt()
@@ -72,13 +75,14 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        applyImmersiveMode()
         window.statusBarColor = BACKGROUND
         window.navigationBarColor = BACKGROUND
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         CookieManager.getInstance().setAcceptCookie(true)
         root = FrameLayout(this).apply { setBackgroundColor(BACKGROUND) }
         setContentView(root)
+        // Samsung's insets controller requires the decor created by setContentView.
+        applyImmersiveMode()
         val savedHost = normalizeHost(prefs.getString(PREF_HOST, "").orEmpty())
         if (savedHost != null) {
             activeHost = savedHost
@@ -93,16 +97,19 @@ class MainActivity : Activity() {
     @Suppress("DEPRECATION")
     private fun applyImmersiveMode() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            window.setDecorFitsSystemWindows(false)
-        }
-        window.decorView.systemUiVisibility = (
-            View.SYSTEM_UI_FLAG_FULLSCREEN or
+            window.setDecorFitsSystemWindows(true)
+            window.insetsController?.let { controller ->
+                controller.hide(WindowInsets.Type.navigationBars())
+                controller.systemBarsBehavior = android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
+        } else {
+            window.decorView.systemUiVisibility = (
                 View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
-                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
-                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
-                View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
-                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-            )
+                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+                    View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
+                    View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                )
+        }
     }
 
     private fun buildConnectScreen() {
@@ -248,12 +255,14 @@ class MainActivity : Activity() {
             }
 
             override fun onPageFinished(view: WebView?, url: String?) {
+                if (::swipeRefresh.isInitialized) swipeRefresh.isRefreshing = false
                 progress.progress = 100
                 progress.postDelayed({ progress.visibility = View.GONE }, 250)
             }
 
             override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
                 if (request?.isForMainFrame == true) {
+                    if (::swipeRefresh.isInitialized) swipeRefresh.isRefreshing = false
                     Toast.makeText(this@MainActivity, "Ne mogu da otvorim AionUi. Proveri Tailscale i da li je Mac dostupan.", Toast.LENGTH_LONG).show()
                 }
             }
@@ -298,7 +307,13 @@ class MainActivity : Activity() {
                 enqueueDownload(uri, userAgent, contentDisposition, mimeType)
             }
         })
-        root.addView(webView, FrameLayout.LayoutParams(-1, -1))
+        swipeRefresh = SwipeRefreshLayout(this).apply {
+            setColorSchemeColors(PRIMARY)
+            setOnRefreshListener { webView.reload() }
+            setOnChildScrollUpCallback { _, _ -> webView.canScrollVertically(-1) }
+            addView(webView, android.view.ViewGroup.LayoutParams(-1, -1))
+        }
+        root.addView(swipeRefresh, FrameLayout.LayoutParams(-1, -1))
         root.addView(progress, FrameLayout.LayoutParams(-1, dp(2), Gravity.TOP))
     }
 
