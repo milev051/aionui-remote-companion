@@ -11,8 +11,8 @@ android {
         applicationId = "rs.milev051.aionuiremote"
         minSdk = 26
         targetSdk = 34
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.2.0"
     }
 
     buildTypes {
@@ -35,4 +35,5 @@ android {
 
 dependencies {
     implementation("androidx.core:core:1.13.1")
+    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
 }

@@ -1,3 +1,8 @@
+## AionUi Remote Companion v1.2.0
+
+- Ostavlja Android statusnu traku vidljivom, dok donju navigacionu traku skriva uz očuvane sistemske geste.
+- Dodaje povlačenje nadole za ručno ponovno učitavanje WebUI stranice.
+
 ## AionUi Remote Companion v1.1.0
 
 - Prikazuje AionUi WebUI preko celog ekrana, bez gornjeg toolbar-a i Android sistemskih traka.

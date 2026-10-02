@@ -7,11 +7,13 @@ Nezvanična Android aplikacija koja prikazuje postojeći AionUi WebUI preko ugra
 1. Instaliraj i poveži Tailscale na Android telefonu.
 2. Pokreni AionUi WebUI na Macu i uključi **Allow Remote Access**.
 3. Pokreni AionUi Remote Companion i unesi Tailscale IPv4 adresu Maca, na primer `100.x.x.x`, ili njegov MagicDNS naziv.
-4. Aplikacija automatski dodaje port `25808` i otvara AionUi preko celog ekrana. Prijavi se postojećim AionUi načinom prijave.
+4. Aplikacija automatski dodaje port `25808` i otvara AionUi preko celog ekrana. Sat i statusne ikonice ostaju vidljivi; donja navigaciona traka je skrivena. Prijavi se postojećim AionUi načinom prijave.
 
 Adresa se čuva samo lokalno u podešavanjima aplikacije na telefonu i ponovo se povezuje pri sledećem pokretanju. Lozinka i pairing kod se ne čuvaju u aplikaciji. Android Back vraća na ekran za promenu adrese ili prethodnu WebUI stranicu. Sistemsku navigaciju možeš privremeno prikazati prevlačenjem od ivice ekrana.
 
 Aplikacija pri pokretanju proverava GitHub Releases i automatski preuzima noviju stabilnu verziju. Android zatim prikazuje sistemsku potvrdu instalacije; tiha instalacija nije dostupna običnim Android aplikacijama. Pri prvom ažuriranju Android može tražiti dozvolu da AionUi Remote instalira APK fajlove.
+
+Povuci WebUI odozgo nadole da ponovo učitaš celu stranicu. Osvežavanje je dostupno kada je stranica već na vrhu; aplikacija ne osvežava celu stranicu u pozadini ili u pravilnim intervalima.
 
 WebUI prati sistemsku svetlu/tamnu temu Androida kada je AionUi Appearance podešen na **System**. Pri promeni sistemske teme Android ponovo pokreće prikaz i aplikacija se vraća na sačuvani AionUi računar.
 
