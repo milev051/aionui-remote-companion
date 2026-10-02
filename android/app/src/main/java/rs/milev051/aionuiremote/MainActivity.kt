@@ -321,12 +321,13 @@ class MainActivity : Activity() {
                     val apkUrl = (0 until assets.length())
                         .map { assets.getJSONObject(it) }
                         .firstOrNull { it.optString("name").endsWith(".apk", true) }
-                        ?.optString("browser_download_url")
-                        ?.takeIf { it.startsWith("https://github.com/") }
+                        ?.optString("url")
+                        ?.takeIf { it.startsWith("https://api.github.com/repos/milev051/aionui-remote-companion/releases/assets/") }
                         ?: return@runCatching null
                     val apkConnection = (URL(apkUrl).openConnection() as HttpURLConnection).apply {
                         connectTimeout = 10_000
                         readTimeout = 30_000
+                        setRequestProperty("Accept", "application/octet-stream")
                         setRequestProperty("User-Agent", "AionUi-Remote-Android")
                     }
                     try {
