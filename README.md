@@ -7,9 +7,13 @@ Nezvanična Android aplikacija koja prikazuje postojeći AionUi WebUI preko ugra
 1. Instaliraj i poveži Tailscale na Android telefonu.
 2. Pokreni AionUi WebUI na Macu i uključi **Allow Remote Access**.
 3. Pokreni AionUi Remote Companion i unesi Tailscale IPv4 adresu Maca, na primer `100.x.x.x`, ili njegov MagicDNS naziv.
-4. Aplikacija automatski dodaje port `25808` i otvara AionUi. Prijavi se postojećim AionUi načinom prijave.
+4. Aplikacija automatski dodaje port `25808` i otvara AionUi preko celog ekrana. Prijavi se postojećim AionUi načinom prijave.
 
-Adresa se čuva samo lokalno u podešavanjima aplikacije na telefonu. Lozinka i pairing kod se ne čuvaju u aplikaciji. Dugme sa strelicom vraća na ekran za promenu adrese, a dugme za osvežavanje ponovo učitava WebUI.
+Adresa se čuva samo lokalno u podešavanjima aplikacije na telefonu i ponovo se povezuje pri sledećem pokretanju. Lozinka i pairing kod se ne čuvaju u aplikaciji. Android Back vraća na ekran za promenu adrese ili prethodnu WebUI stranicu. Sistemsku navigaciju možeš privremeno prikazati prevlačenjem od ivice ekrana.
+
+Aplikacija pri pokretanju proverava GitHub Releases i automatski preuzima noviju stabilnu verziju. Android zatim prikazuje sistemsku potvrdu instalacije; tiha instalacija nije dostupna običnim Android aplikacijama. Pri prvom ažuriranju Android može tražiti dozvolu da AionUi Remote instalira APK fajlove.
+
+WebUI prati sistemsku svetlu/tamnu temu Androida kada je AionUi Appearance podešen na **System**. Pri promeni sistemske teme Android ponovo pokreće prikaz i aplikacija se vraća na sačuvani AionUi računar.
 
 Aplikacija prihvata Tailscale IPv4 opseg, privatne LAN IPv4 adrese, MagicDNS imena koja se završavaju sa `.ts.net`, kratka imena uređaja i `.local` imena. IPv6 adrese trenutno nisu podržane. Za udaljeni pristup preporučena je Tailscale adresa ili MagicDNS ime.
 
@@ -29,7 +33,7 @@ Ovo je nezvanični projekat zajednice i nije povezan sa autorima AionUi-ja ili T
 
 ## Instalacija
 
-Preuzmi `AionUi-Remote-Companion-v1.0.0.apk` iz [GitHub Releases](https://github.com/milev051/aionui-remote-companion/releases/latest). Android može tražiti da dozvoliš instalaciju aplikacija preuzetih iz browsera.
+Preuzmi najnoviji `AionUi-Remote-Companion-*.apk` iz [GitHub Releases](https://github.com/milev051/aionui-remote-companion/releases/latest). Android može tražiti dozvolu za instalaciju APK fajlova.
 
 ## Izgradnja iz izvornog koda
 

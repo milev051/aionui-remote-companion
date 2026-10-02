@@ -1,3 +1,10 @@
+## AionUi Remote Companion v1.1.0
+
+- Prikazuje AionUi WebUI preko celog ekrana, bez gornjeg toolbar-a i Android sistemskih traka.
+- Prati sistemsku svetlu/tamnu temu kada je AionUi Appearance podešen na System.
+- Automatski proverava stabilna GitHub izdanja pri pokretanju, preuzima noviji APK i otvara Android instalater.
+- Ponovo otvara poslednji sačuvani AionUi računar nakon ponovnog pokretanja aplikacije.
+
 ## AionUi Remote Companion v1.0.0
 
 Prva verzija Android klijenta za otvaranje AionUi WebUI-ja preko Tailscale ili privatne LAN adrese.

@@ -4,12 +4,15 @@ import android.app.Activity
 import android.app.DownloadManager
 import android.content.Context
 import android.content.Intent
+import android.content.ActivityNotFoundException
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
+import android.os.Build
+import android.provider.Settings
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
@@ -31,6 +34,11 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.content.FileProvider
+import org.json.JSONObject
+import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
 import java.io.ByteArrayInputStream
 
 class MainActivity : Activity() {
@@ -43,10 +51,16 @@ class MainActivity : Activity() {
     private lateinit var webView: WebView
     private var activeHost: String? = null
     private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
+    private var pendingUpdateFile: File? = null
 
     companion object {
         private const val FILE_CHOOSER_REQUEST = 7301
+        private const val UPDATE_INSTALL_REQUEST = 7302
+        private const val UPDATE_SETTINGS_REQUEST = 7303
         private const val PREF_HOST = "host"
+        private const val PREF_UPDATE_PENDING = "update_pending"
+        private const val RELEASE_API = "https://api.github.com/repos/milev051/aionui-remote-companion/releases/latest"
+        private const val VERSION_NAME = "1.1.0"
         private const val BACKGROUND = 0xFF10131A.toInt()
         private const val CARD = 0xFF191E28.toInt()
         private const val FIELD = 0xFF232A36.toInt()
@@ -58,13 +72,37 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        applyImmersiveMode()
         window.statusBarColor = BACKGROUND
         window.navigationBarColor = BACKGROUND
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         CookieManager.getInstance().setAcceptCookie(true)
         root = FrameLayout(this).apply { setBackgroundColor(BACKGROUND) }
         setContentView(root)
-        buildConnectScreen()
+        val savedHost = normalizeHost(prefs.getString(PREF_HOST, "").orEmpty())
+        if (savedHost != null) {
+            activeHost = savedHost
+            buildWebScreen()
+            webView.loadUrl("http://$savedHost:$port/")
+        } else {
+            buildConnectScreen()
+        }
+        checkForUpdate()
+    }
+
+    @Suppress("DEPRECATION")
+    private fun applyImmersiveMode() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.setDecorFitsSystemWindows(false)
+        }
+        window.decorView.systemUiVisibility = (
+            View.SYSTEM_UI_FLAG_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+            )
     }
 
     private fun buildConnectScreen() {
@@ -161,60 +199,12 @@ class MainActivity : Activity() {
         }
         activeHost = host
         prefs.edit().putString(PREF_HOST, host).apply()
-        buildWebScreen(host)
+        buildWebScreen()
         webView.loadUrl("http://$host:$port/")
     }
 
-    private fun buildWebScreen(host: String) {
+    private fun buildWebScreen() {
         root.removeAllViews()
-        val panel = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(BACKGROUND)
-        }
-        val toolbar = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(8), dp(4), dp(12), dp(4))
-        }
-        val changeButton = Button(this).apply {
-            text = "‹"
-            textSize = 30f
-            isAllCaps = false
-            minWidth = 0
-            minimumWidth = 0
-            setPadding(0, 0, 0, dp(5))
-            setTextColor(TEXT)
-            background = transparentDrawable()
-            contentDescription = "Promeni adresu"
-            setOnClickListener { buildConnectScreen() }
-        }
-        toolbar.addView(changeButton, LinearLayout.LayoutParams(dp(48), dp(48)))
-        val titleArea = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        titleArea.addView(label("AionUi", 16f, TEXT, true))
-        titleArea.addView(label(host, 11f, MUTED, false).apply { setPadding(0, dp(2), 0, 0) })
-        toolbar.addView(titleArea, LinearLayout.LayoutParams(0, -2, 1f))
-        val reloadButton = Button(this).apply {
-            text = "↻"
-            textSize = 22f
-            isAllCaps = false
-            minWidth = 0
-            minimumWidth = 0
-            setTextColor(TEXT)
-            background = transparentDrawable()
-            contentDescription = "Osveži"
-            setOnClickListener { webView.reload() }
-        }
-        toolbar.addView(reloadButton, LinearLayout.LayoutParams(dp(48), dp(48)))
-        panel.addView(toolbar, LinearLayout.LayoutParams(-1, dp(56)))
-
-        progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
-            max = 100
-            progress = 0
-            progressTintList = android.content.res.ColorStateList.valueOf(PRIMARY)
-            progressBackgroundTintList = android.content.res.ColorStateList.valueOf(BACKGROUND)
-        }
-        panel.addView(progress, LinearLayout.LayoutParams(-1, dp(2)))
-
         webView = WebView(this).apply { setBackgroundColor(Color.WHITE) }
         webView.settings.apply {
             javaScriptEnabled = true
@@ -226,7 +216,14 @@ class MainActivity : Activity() {
             loadsImagesAutomatically = true
             setSupportMultipleWindows(false)
             javaScriptCanOpenWindowsAutomatically = false
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) safeBrowsingEnabled = true
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) safeBrowsingEnabled = true
+        }
+        progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+            max = 100
+            progress = 0
+            progressTintList = android.content.res.ColorStateList.valueOf(PRIMARY)
+            progressBackgroundTintList = android.content.res.ColorStateList.valueOf(BACKGROUND)
+            visibility = View.GONE
         }
         webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest): Boolean = routeUrl(request.url)
@@ -301,8 +298,127 @@ class MainActivity : Activity() {
                 enqueueDownload(uri, userAgent, contentDisposition, mimeType)
             }
         })
-        panel.addView(webView, LinearLayout.LayoutParams(-1, 0, 1f))
-        root.addView(panel, FrameLayout.LayoutParams(-1, -1))
+        root.addView(webView, FrameLayout.LayoutParams(-1, -1))
+        root.addView(progress, FrameLayout.LayoutParams(-1, dp(2), Gravity.TOP))
+    }
+
+    private fun checkForUpdate() {
+        Thread {
+            val apkFile = runCatching {
+                val connection = (URL(RELEASE_API).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 8_000
+                    readTimeout = 12_000
+                    setRequestProperty("Accept", "application/vnd.github+json")
+                    setRequestProperty("User-Agent", "AionUi-Remote-Android")
+                }
+                try {
+                    if (connection.responseCode !in 200..299) return@runCatching null
+                    val release = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
+                    if (release.optBoolean("draft") || release.optBoolean("prerelease")) return@runCatching null
+                    val latestTag = release.optString("tag_name").removePrefix("v")
+                    if (compareVersions(latestTag, VERSION_NAME) <= 0) return@runCatching null
+                    val assets = release.optJSONArray("assets") ?: return@runCatching null
+                    val apkUrl = (0 until assets.length())
+                        .map { assets.getJSONObject(it) }
+                        .firstOrNull { it.optString("name").endsWith(".apk", true) }
+                        ?.optString("browser_download_url")
+                        ?.takeIf { it.startsWith("https://github.com/") }
+                        ?: return@runCatching null
+                    val apkConnection = (URL(apkUrl).openConnection() as HttpURLConnection).apply {
+                        connectTimeout = 10_000
+                        readTimeout = 30_000
+                        setRequestProperty("User-Agent", "AionUi-Remote-Android")
+                    }
+                    try {
+                        if (apkConnection.responseCode !in 200..299) return@runCatching null
+                        val output = File(cacheDir, "aionui-remote-update.apk")
+                        apkConnection.inputStream.use { input -> output.outputStream().use(input::copyTo) }
+                        output.takeIf { it.length() > 0L }
+                    } finally {
+                        apkConnection.disconnect()
+                    }
+                } finally {
+                    connection.disconnect()
+                }
+            }.getOrNull()
+
+            if (apkFile != null) runOnUiThread {
+                Toast.makeText(this, "Ažuriranje je preuzeto. Otvaram instalaciju…", Toast.LENGTH_LONG).show()
+                installUpdate(apkFile)
+            }
+        }.start()
+    }
+
+    private fun compareVersions(left: String, right: String): Int {
+        val a = left.split('.').map { it.toIntOrNull() ?: 0 }
+        val b = right.split('.').map { it.toIntOrNull() ?: 0 }
+        for (index in 0 until maxOf(a.size, b.size)) {
+            val comparison = (a.getOrElse(index) { 0 }).compareTo(b.getOrElse(index) { 0 })
+            if (comparison != 0) return comparison
+        }
+        return 0
+    }
+
+    private fun installUpdate(file: File) {
+        pendingUpdateFile = file
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !packageManager.canRequestPackageInstalls()) {
+            prefs.edit().putString(PREF_UPDATE_PENDING, file.absolutePath).apply()
+            Toast.makeText(this, "Dozvoli instalaciju za AionUi Remote da završiš ažuriranje.", Toast.LENGTH_LONG).show()
+            val settingsIntent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName"))
+            runCatching { startActivityForResult(settingsIntent, UPDATE_SETTINGS_REQUEST) }
+                .onFailure { Toast.makeText(this, "Android nije otvorio podešavanje dozvole za instalaciju.", Toast.LENGTH_LONG).show() }
+            return
+        }
+        openPackageInstaller(file)
+    }
+
+    private fun openPackageInstaller(file: File) {
+        try {
+            val apkUri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
+            val intent = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
+                data = apkUri
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                putExtra(Intent.EXTRA_RETURN_RESULT, true)
+            }
+            startActivityForResult(intent, UPDATE_INSTALL_REQUEST)
+            prefs.edit().remove(PREF_UPDATE_PENDING).apply()
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(this, "Nije pronađen Android instalater paketa.", Toast.LENGTH_LONG).show()
+        } catch (_: Exception) {
+            Toast.makeText(this, "Ažuriranje nije moglo da se pokrene.", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    @Deprecated("Android installer/settings result")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == UPDATE_SETTINGS_REQUEST) {
+            val file = pendingUpdateFile ?: prefs.getString(PREF_UPDATE_PENDING, null)?.let(::File)
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || packageManager.canRequestPackageInstalls()) {
+                if (file != null && file.exists()) openPackageInstaller(file)
+            } else {
+                Toast.makeText(this, "Instalacija ažuriranja je otkazana.", Toast.LENGTH_SHORT).show()
+            }
+            return
+        }
+        if (requestCode == UPDATE_INSTALL_REQUEST) {
+            pendingUpdateFile?.delete()
+            pendingUpdateFile = null
+            prefs.edit().remove(PREF_UPDATE_PENDING).apply()
+        }
+        if (requestCode != FILE_CHOOSER_REQUEST) return
+        val callback = fileChooserCallback ?: return
+        fileChooserCallback = null
+        if (resultCode != RESULT_OK || data == null) {
+            callback.onReceiveValue(null)
+            return
+        }
+        val results = mutableListOf<Uri>()
+        data.clipData?.let { clip ->
+            for (index in 0 until clip.itemCount) results.add(clip.getItemAt(index).uri)
+        }
+        if (results.isEmpty()) data.data?.let(results::add)
+        callback.onReceiveValue(results.takeIf { it.isNotEmpty() }?.toTypedArray())
     }
 
     private fun routeUrl(uri: Uri): Boolean {
@@ -337,24 +453,6 @@ class MainActivity : Activity() {
         } catch (_: Exception) {
             Toast.makeText(this, "Preuzimanje nije uspelo.", Toast.LENGTH_SHORT).show()
         }
-    }
-
-    @Deprecated("Android file picker callback")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode != FILE_CHOOSER_REQUEST) return
-        val callback = fileChooserCallback ?: return
-        fileChooserCallback = null
-        if (resultCode != RESULT_OK || data == null) {
-            callback.onReceiveValue(null)
-            return
-        }
-        val results = mutableListOf<Uri>()
-        data.clipData?.let { clip ->
-            for (index in 0 until clip.itemCount) results.add(clip.getItemAt(index).uri)
-        }
-        if (results.isEmpty()) data.data?.let(results::add)
-        callback.onReceiveValue(results.takeIf { it.isNotEmpty() }?.toTypedArray())
     }
 
     private fun normalizeHost(raw: String): String? {
@@ -398,6 +496,11 @@ class MainActivity : Activity() {
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) applyImmersiveMode()
+    }
 
     @Suppress("DEPRECATION")
     override fun onBackPressed() {
